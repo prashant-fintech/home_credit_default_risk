@@ -13,5 +13,9 @@ class Settings(BaseSettings):
     mlflow_tracking_uri: str = "mlruns"
     model_registry_name: str = "home-credit-lgbm"
 
+    # Set to load CSVs straight from S3 instead of data/raw/
+    # e.g. s3://home-credit-default-risk-405894863747/raw
+    s3_data_uri: str | None = None
+
 
 settings = Settings()

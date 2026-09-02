@@ -20,11 +20,17 @@ from home_credit.data.schema import (
 )
 
 
-def _read(filename: str, schema: TableSchema, data_dir: Path) -> pd.DataFrame:
-    path = data_dir / filename
-    if not path.exists():
-        raise FileNotFoundError(f"{path} not found — download the dataset from Kaggle first")
-    df = pd.read_csv(path)
+def _read(filename: str, schema: TableSchema, data_dir: Path, s3_uri: str | None) -> pd.DataFrame:
+    if s3_uri:
+        uri = f"{s3_uri.rstrip('/')}/{filename}"
+        df = pd.read_csv(uri, storage_options={"anon": False})
+    else:
+        path = data_dir / filename
+        if not path.exists():
+            raise FileNotFoundError(
+                f"{path} not found — set S3_DATA_URI or download the dataset from Kaggle"
+            )
+        df = pd.read_csv(path)
     validate(df, schema)
     return df
 
@@ -53,15 +59,25 @@ class RawDataset:
         return self.application_test["SK_ID_CURR"]
 
 
-def load(data_dir: Path | None = None) -> RawDataset:
+def load(data_dir: Path | None = None, s3_uri: str | None = None) -> RawDataset:
+    """Load all tables from local disk or S3.
+
+    S3 takes precedence when s3_uri is given or S3_DATA_URI is set in the environment.
+    Example S3 URI: s3://home-credit-default-risk-405894863747/raw
+    """
     d = data_dir or settings.data_dir
+    s = s3_uri or settings.s3_data_uri
+
+    def r(filename: str, schema: TableSchema) -> pd.DataFrame:
+        return _read(filename, schema, d, s)
+
     return RawDataset(
-        application_train=_read("application_train.csv", APPLICATION, d),
-        application_test=_read("application_test.csv", APPLICATION_TEST, d),
-        bureau=_read("bureau.csv", BUREAU, d),
-        bureau_balance=_read("bureau_balance.csv", BUREAU_BALANCE, d),
-        previous_application=_read("previous_application.csv", PREVIOUS_APPLICATION, d),
-        pos_cash=_read("POS_CASH_balance.csv", POS_CASH, d),
-        installments=_read("installments_payments.csv", INSTALLMENTS, d),
-        credit_card=_read("credit_card_balance.csv", CREDIT_CARD, d),
+        application_train=r("application_train.csv", APPLICATION),
+        application_test=r("application_test.csv", APPLICATION_TEST),
+        bureau=r("bureau.csv", BUREAU),
+        bureau_balance=r("bureau_balance.csv", BUREAU_BALANCE),
+        previous_application=r("previous_application.csv", PREVIOUS_APPLICATION),
+        pos_cash=r("POS_CASH_balance.csv", POS_CASH),
+        installments=r("installments_payments.csv", INSTALLMENTS),
+        credit_card=r("credit_card_balance.csv", CREDIT_CARD),
     )
