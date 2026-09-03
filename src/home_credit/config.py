@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # Set to load CSVs straight from S3 instead of data/raw/
     # e.g. s3://home-credit-default-risk-405894863747/raw
     s3_data_uri: str | None = None
+    # Set to load CSVs from ADLS Gen2 instead (takes precedence over S3). Needs `az login`.
+    # e.g. abfss://home-credit@sthomecreditXXXX.dfs.core.windows.net/raw
+    azure_data_uri: str | None = None
 
 
 settings = Settings()

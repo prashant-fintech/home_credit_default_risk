@@ -1,0 +1,49 @@
+# Databricks Asset Bundle for the Home Credit medallion pipeline.
+#
+# Deploy + run from this directory (or with `make dbx-deploy` / `make dbx-run`):
+#   export DATABRICKS_CONFIG_PROFILE=home-credit
+#   databricks bundle validate
+#   databricks bundle deploy  -t dev
+#   databricks bundle run     -t dev home_credit_medallion
+# Override any variable with --var="name=value", e.g.
+#   databricks bundle deploy -t dev --var="raw_path=/Volumes/workspace/default/home_credit_raw"
+#
+# The bundle root is this folder, so only databricks/ is synced to the workspace.
+bundle:
+  name: home_credit_default_risk
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog that holds the bronze/silver/gold schemas
+    default: learningdatabricks
+  raw_path:
+    description: Volume path holding the raw CSVs (uploaded via UI, or the external volume from 00)
+    default: /Volumes/learningdatabricks/home-credit-default-risk/home-credit-default-risk
+  # Only needed when bringing your own ADLS container (infra/azure/provision.sh).
+  # Leave empty when the CSVs were uploaded to a volume through the workspace UI.
+  storage_account:
+    description: ADLS Gen2 account name (AZ_STORAGE in infra/azure/.env.azure)
+    default: ""
+  container:
+    description: Container holding raw/ (AZ_CONTAINER in infra/azure/.env.azure)
+    default: home-credit
+  access_connector_id:
+    description: Resource ID of the Databricks access connector (AZ_ACCESS_CONNECTOR_ID)
+    default: ""
+  # Only used if you switch the job back to classic compute (see medallion_job.yml)
+  spark_version:
+    description: ML runtime so LightGBM, MLflow and scikit-learn are preinstalled
+    default: 15.4.x-cpu-ml-scala2.12
+  node_type_id:
+    description: 4 vCPU / 16 GB (DS3_v2 was stocked out in eastus on 2026-09-03)
+    default: Standard_D4ds_v5
+
+targets:
+  dev:
+    # development mode prefixes resource names with "[dev <user>]", pauses
+    # schedules, and deploys to /Users/<you>/.bundle/... in the workspace.
+    mode: development
+    default: true

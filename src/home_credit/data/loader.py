@@ -1,7 +1,8 @@
-"""Load and validate all Home Credit CSV files from data/raw/."""
+"""Load and validate all Home Credit CSV files from local disk, S3, or ADLS Gen2."""
 
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pandas as pd
 
@@ -19,16 +20,40 @@ from home_credit.data.schema import (
     validate,
 )
 
+AZURE_SCHEMES = {"abfs", "abfss", "az"}
 
-def _read(filename: str, schema: TableSchema, data_dir: Path, s3_uri: str | None) -> pd.DataFrame:
-    if s3_uri:
-        uri = f"{s3_uri.rstrip('/')}/{filename}"
-        df = pd.read_csv(uri, storage_options={"anon": False})
+
+def storage_options(uri: str) -> dict[str, object]:
+    """fsspec options for a remote data URI.
+
+    - s3://bucket/prefix                                   -> ambient AWS credentials (s3fs)
+    - abfss://container@account.dfs.core.windows.net/path  -> ambient Azure login via
+      DefaultAzureCredential (adlfs); run `az login` first
+    """
+    parsed = urlparse(uri)
+    if parsed.scheme == "s3":
+        return {"anon": False}
+    if parsed.scheme in AZURE_SCHEMES:
+        # netloc is "<container>@<account>.dfs.core.windows.net"
+        account = parsed.netloc.split("@")[-1].split(".")[0]
+        if not account:
+            raise ValueError(f"cannot parse storage account from {uri}")
+        return {"account_name": account, "anon": False}
+    raise ValueError(f"unsupported remote URI scheme: {uri}")
+
+
+def _read(
+    filename: str, schema: TableSchema, data_dir: Path, remote_uri: str | None
+) -> pd.DataFrame:
+    if remote_uri:
+        uri = f"{remote_uri.rstrip('/')}/{filename}"
+        df = pd.read_csv(uri, storage_options=storage_options(remote_uri))
     else:
         path = data_dir / filename
         if not path.exists():
             raise FileNotFoundError(
-                f"{path} not found — set S3_DATA_URI or download the dataset from Kaggle"
+                f"{path} not found — set AZURE_DATA_URI / S3_DATA_URI or download the "
+                "dataset from Kaggle"
             )
         df = pd.read_csv(path)
     validate(df, schema)
@@ -59,17 +84,24 @@ class RawDataset:
         return self.application_test["SK_ID_CURR"]
 
 
-def load(data_dir: Path | None = None, s3_uri: str | None = None) -> RawDataset:
-    """Load all tables from local disk or S3.
+def load(
+    data_dir: Path | None = None,
+    s3_uri: str | None = None,
+    remote_uri: str | None = None,
+) -> RawDataset:
+    """Load all tables from local disk, S3, or ADLS Gen2.
 
-    S3 takes precedence when s3_uri is given or S3_DATA_URI is set in the environment.
-    Example S3 URI: s3://home-credit-default-risk-405894863747/raw
+    Precedence: explicit remote_uri / s3_uri argument, then AZURE_DATA_URI, then
+    S3_DATA_URI from the environment, then local data_dir.
+    Example URIs:
+        s3://home-credit-default-risk-405894863747/raw
+        abfss://home-credit@sthomecreditXXXX.dfs.core.windows.net/raw
     """
     d = data_dir or settings.data_dir
-    s = s3_uri or settings.s3_data_uri
+    remote = remote_uri or s3_uri or settings.azure_data_uri or settings.s3_data_uri
 
     def r(filename: str, schema: TableSchema) -> pd.DataFrame:
-        return _read(filename, schema, d, s)
+        return _read(filename, schema, d, remote)
 
     return RawDataset(
         application_train=r("application_train.csv", APPLICATION),

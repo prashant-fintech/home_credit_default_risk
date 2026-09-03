@@ -1,0 +1,68 @@
+# One Databricks Job (Workflow) that runs the medallion notebooks in order.
+# Job-level parameters are exposed to every notebook task as widgets, so the
+# notebooks call dbutils.widgets.get("catalog") etc.
+resources:
+  jobs:
+    home_credit_medallion:
+      name: home-credit-medallion
+      description: Raw CSVs on ADLS -> bronze (Auto Loader) -> silver -> gold features -> LightGBM -> batch scores
+
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: raw_path
+          default: ${var.raw_path}
+        - name: storage_account
+          default: ${var.storage_account}
+        - name: container
+          default: ${var.container}
+        - name: access_connector_id
+          default: ${var.access_connector_id}
+
+      # Serverless compute: no job_clusters block and no job_cluster_key on the tasks.
+      # Databricks provisions and scales the compute; no VM quota or SKU stockouts to fight.
+      # (On 2026-09-03 eastus had DS3_v2 stocked out and zero quota for the Dv5 family.)
+      # To use classic compute instead, restore a job_clusters block, e.g.:
+      #   job_clusters:
+      #     - job_cluster_key: single_node
+      #       new_cluster:
+      #         spark_version: ${var.spark_version}
+      #         node_type_id: ${var.node_type_id}
+      #         num_workers: 0
+      #         data_security_mode: SINGLE_USER
+      #         spark_conf: {spark.databricks.cluster.profile: singleNode, spark.master: "local[*, 4]"}
+      #         custom_tags: {ResourceClass: SingleNode}
+      # and add `job_cluster_key: single_node` to every task.
+
+      tasks:
+        - task_key: setup_unity_catalog
+          notebook_task:
+            notebook_path: ../notebooks/00_setup_unity_catalog.py
+
+        - task_key: bronze_ingest
+          depends_on: [{ task_key: setup_unity_catalog }]
+          notebook_task:
+            notebook_path: ../notebooks/01_bronze_autoloader.py
+
+        - task_key: silver_clean
+          depends_on: [{ task_key: bronze_ingest }]
+          notebook_task:
+            notebook_path: ../notebooks/02_silver_clean.py
+
+        - task_key: gold_features
+          depends_on: [{ task_key: silver_clean }]
+          notebook_task:
+            notebook_path: ../notebooks/03_gold_features.py
+
+        - task_key: train_lgbm
+          depends_on: [{ task_key: gold_features }]
+          notebook_task:
+            notebook_path: ../notebooks/04_train_lgbm.py
+
+        - task_key: batch_score
+          depends_on: [{ task_key: train_lgbm }]
+          notebook_task:
+            notebook_path: ../notebooks/05_batch_score.py
+
+      max_concurrent_runs: 1
+      timeout_seconds: 10800

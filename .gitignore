@@ -30,3 +30,7 @@ Thumbs.db
 # Logs
 *.log
 *.err
+
+# Azure / Databricks
+infra/azure/.env.azure
+.databricks/
