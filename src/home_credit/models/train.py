@@ -73,8 +73,8 @@ def train(
             )
             model.fit(
                 X_trn, y_trn,
-                eval_X=[X_val],
-                eval_y=[y_val],
+                eval_X=X_val,
+                eval_y=y_val,
                 callbacks=[
                     lgb.early_stopping(early_stopping, verbose=False),
                     lgb.log_evaluation(100),
