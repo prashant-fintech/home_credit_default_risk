@@ -101,13 +101,16 @@ def report(y_true, y_score, prefix: str) -> dict[str, float]:
 
 
 class LGBMCategoricalModel(mlflow.pyfunc.PythonModel):
-    def __init__(self, booster: lgb.Booster, num_cols: list[str], obj_cols: list[str]):
+    def __init__(
+        self, booster: lgb.Booster, columns: list[str], num_cols: list[str], obj_cols: list[str]
+    ):
         self.booster = booster
+        self.columns = columns  # training order: LightGBM matches pandas columns by POSITION
         self.num_cols = num_cols
         self.obj_cols = obj_cols
 
     def predict(self, context, model_input: pd.DataFrame, params=None) -> np.ndarray:
-        df = model_input[self.num_cols + self.obj_cols].copy()
+        df = model_input[self.columns].copy()
         df[self.num_cols] = df[self.num_cols].astype("float64")
         for c in self.obj_cols:
             # LightGBM re-aligns categories to the training categories via pandas_categorical
@@ -117,8 +120,7 @@ class LGBMCategoricalModel(mlflow.pyfunc.PythonModel):
 
 signature = ModelSignature(
     inputs=Schema(
-        [ColSpec(DataType.double, c) for c in num_cols]
-        + [ColSpec(DataType.string, c) for c in obj_cols]
+        [ColSpec(DataType.string if c in obj_cols else DataType.double, c) for c in X_raw.columns]
     ),
     outputs=Schema([ColSpec(DataType.double)]),
 )
@@ -180,9 +182,18 @@ with mlflow.start_run(run_name=f"lgbm_{n_folds}fold") as run:
     mlflow.log_table(importance, "feature_importance.json")
 
     best_fold = int(np.argmax(fold_auc))
+    wrapper = LGBMCategoricalModel(boosters[best_fold], list(X.columns), num_cols, obj_cols)
+
+    # Guard against feature-order / dtype drift between the wrapper and the raw booster
+    check = slice(0, 5000)
+    wrapped = wrapper.predict(None, X_raw.iloc[check])
+    direct = boosters[best_fold].predict(X.iloc[check])
+    assert np.allclose(wrapped, direct), "pyfunc wrapper predictions diverge from the booster"
+    mlflow.log_metric("check_mean_prob_head5000", float(wrapped.mean()))
+
     info = mlflow.pyfunc.log_model(
         name="model",
-        python_model=LGBMCategoricalModel(boosters[best_fold], num_cols, obj_cols),
+        python_model=wrapper,
         signature=signature,
         input_example=X_raw.head(5),
         registered_model_name=MODEL_NAME,
