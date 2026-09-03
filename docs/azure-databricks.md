@@ -143,7 +143,7 @@ from ADLS using your `az login` session.
 | `MERGE INTO`, constraints, `OPTIMIZE` / `ZORDER`, time travel, `overwriteSchema` | `02_silver_clean.py` |
 | DataFrame API aggregations, null semantics, feature tables via primary key | `03_gold_features.py` |
 | MLflow experiments, UC model registry, signatures, aliases, custom pyfunc | `04_train_lgbm.py` |
-| `spark_udf` batch inference, alias-based model resolution | `05_batch_score.py` |
+| pyfunc `load_model` inference with signature enforcement, alias-based model resolution, `dbutils.notebook.exit` task output | `05_batch_score.py` |
 | Jobs / Workflows, task dependencies, job parameters, job clusters, asset bundles | `databricks/resources/medallion_job.yml`, `databricks.yml` |
 
 ## Suggested follow-up exercises
@@ -156,3 +156,6 @@ from ADLS using your `az login` session.
 4. Package `src/home_credit` as a wheel through the bundle `artifacts:` block and import the
    pandas feature code in a notebook instead of the inline PySpark port.
 5. Deploy the champion model to **Model Serving** and call it from `home_credit/serving/app.py`.
+6. Make scoring distributed again: `mlflow.pyfunc.spark_udf` failed on serverless because the
+   UDF batches carry nullable `Int64` columns that MLflow's schema enforcement will not widen to
+   `double`. Write a `pandas_udf` that loads the model once per executor and casts before predict.
