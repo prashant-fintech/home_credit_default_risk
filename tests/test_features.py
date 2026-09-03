@@ -8,8 +8,6 @@ from home_credit.features.pipeline import (
     _application_features,
     _bureau_features,
     _installments_features,
-    _pos_cash_features,
-    _previous_application_features,
 )
 
 

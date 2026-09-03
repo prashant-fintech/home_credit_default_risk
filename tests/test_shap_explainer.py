@@ -7,7 +7,6 @@ import pytest
 
 from home_credit.explain import shap_explainer
 
-
 # ---------------------------------------------------------------------------
 # Fixture: train a tiny LightGBM model so we have a real booster
 # ---------------------------------------------------------------------------

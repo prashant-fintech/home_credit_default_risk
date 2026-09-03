@@ -8,20 +8,20 @@ probability score between 0 and 1.
 """
 
 import mlflow
-import mlflow.pyfunc
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from mlflow.pyfunc import PyFuncModel
 from pydantic import BaseModel, Field
 
 from home_credit.config import settings
 
 app = FastAPI(title="Home Credit Default Risk Scorer", version="0.1.0")
 
-_model: mlflow.pyfunc.PyFuncModel | None = None
+_model: PyFuncModel | None = None
 
 
-def _get_model() -> mlflow.pyfunc.PyFuncModel:
+def _get_model() -> PyFuncModel:
     global _model
     if _model is None:
         mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -76,7 +76,7 @@ def predict(payload: ApplicationInput) -> PredictionResponse:
 
     row = pd.DataFrame([payload.model_dump()])
     try:
-        prob = float(model.predict(row)[0])
+        prob = float(np.asarray(model.predict(row)).ravel()[0])
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Prediction failed: {exc}") from exc
 

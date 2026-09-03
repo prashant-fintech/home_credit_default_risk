@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from home_credit.data.schema import APPLICATION, BUREAU, TableSchema, validate
+from home_credit.data.schema import APPLICATION, BUREAU, validate
 
 
 def test_validate_passes_when_all_columns_present():

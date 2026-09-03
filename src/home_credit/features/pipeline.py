@@ -18,7 +18,6 @@ import pandas as pd
 from home_credit.config import settings
 from home_credit.data.loader import RawDataset
 
-
 # ---------------------------------------------------------------------------
 # Application table — main features
 # ---------------------------------------------------------------------------

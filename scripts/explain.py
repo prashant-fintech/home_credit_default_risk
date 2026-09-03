@@ -11,7 +11,6 @@ import argparse
 from pathlib import Path
 
 import mlflow
-import pandas as pd
 
 from home_credit.config import settings
 from home_credit.data.loader import load

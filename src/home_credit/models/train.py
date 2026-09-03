@@ -81,7 +81,7 @@ def train(
                 ],
             )
 
-            val_preds = model.predict_proba(X_val)[:, 1]
+            val_preds = np.asarray(model.predict_proba(X_val))[:, 1]
             result.oof_predictions[val_idx] = val_preds
 
             fold_metrics = report(y_val.values, val_preds, prefix=f"fold{fold+1}")
