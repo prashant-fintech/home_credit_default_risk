@@ -10,7 +10,8 @@ class Settings(BaseSettings):
 
     data_dir: Path = Path("data/raw")
     processed_dir: Path = Path("data/processed")
-    mlflow_tracking_uri: str = "mlruns"
+    # MLflow 3.x rejects the file-store backend ("mlruns"); use a SQLite DB instead
+    mlflow_tracking_uri: str = "sqlite:///mlflow.db"
     model_registry_name: str = "home-credit-lgbm"
 
     # Set to load CSVs straight from S3 instead of data/raw/
