@@ -12,6 +12,9 @@ Typical workflow:
     waterfall  = shap_explainer.waterfall_data(shap_vals, X_train, idx=0)
 """
 
+import tempfile
+from pathlib import Path
+
 import mlflow
 import numpy as np
 import pandas as pd
@@ -113,9 +116,9 @@ def log_to_mlflow(shap_values: np.ndarray, feature_names: list[str]) -> None:
     """Log mean-|SHAP| importance table as an MLflow artifact."""
     imp = importance_df(shap_values, feature_names)
     try:
-        with mlflow.start_run(nested=True):
-            imp_path = "/tmp/shap_importance.csv"
+        with mlflow.start_run(nested=True), tempfile.TemporaryDirectory() as tmp:
+            imp_path = Path(tmp) / "shap_importance.csv"
             imp.to_csv(imp_path, index=False)
-            mlflow.log_artifact(imp_path, artifact_path="explain")
+            mlflow.log_artifact(str(imp_path), artifact_path="explain")
     except Exception:
         pass

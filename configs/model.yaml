@@ -24,4 +24,4 @@ training:
 serving:
   host: "0.0.0.0"
   port: 8000
-  model_stage: "Production"
+  model_alias: "champion"

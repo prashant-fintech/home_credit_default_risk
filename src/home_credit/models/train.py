@@ -70,11 +70,11 @@ def train(
                 **lgbm_params,
                 n_estimators=n_estimators,
                 random_state=seed,
-                categorical_feature=cat_cols or "auto",
             )
             model.fit(
                 X_trn, y_trn,
-                eval_set=[(X_val, y_val)],
+                eval_X=[X_val],
+                eval_y=[y_val],
                 callbacks=[
                     lgb.early_stopping(early_stopping, verbose=False),
                     lgb.log_evaluation(100),
@@ -107,13 +107,19 @@ def train(
             .reset_index()
         )
 
-        # Register best model (fold with highest val AUC)
+        # Register best model (fold with highest val AUC) and point the
+        # serving alias at it. MLflow 3 replaces stages with aliases.
         best_fold = max(range(n_folds), key=lambda i: result.fold_metrics[i][f"fold{i+1}_auc"])
-        mlflow.lightgbm.log_model(
+        info = mlflow.lightgbm.log_model(
             result.models[best_fold],
-            artifact_path="model",
+            name="model",
             registered_model_name=settings.model_registry_name,
         )
+        if info.registered_model_version is not None:
+            mlflow.MlflowClient().set_registered_model_alias(
+                settings.model_registry_name, settings.model_alias, info.registered_model_version
+            )
+            print(f"Registered version {info.registered_model_version} as @{settings.model_alias}")
 
     return result
 

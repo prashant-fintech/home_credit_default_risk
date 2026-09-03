@@ -25,7 +25,7 @@ def _get_model() -> PyFuncModel:
     global _model
     if _model is None:
         mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-        model_uri = f"models:/{settings.model_registry_name}/Production"
+        model_uri = f"models:/{settings.model_registry_name}@{settings.model_alias}"
         try:
             _model = mlflow.pyfunc.load_model(model_uri)
         except Exception as exc:

@@ -27,7 +27,7 @@ if __name__ == "__main__":
     model_uri = (
         f"runs:/{args.run_id}/model"
         if args.run_id
-        else f"models:/{settings.model_registry_name}/Production"
+        else f"models:/{settings.model_registry_name}@{settings.model_alias}"
     )
     print(f"Loading model from {model_uri}...")
     model = mlflow.pyfunc.load_model(model_uri)
